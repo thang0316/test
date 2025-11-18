@@ -4,7 +4,7 @@ server:
 spring:
   # Database Configuration
   datasource:
-    url: jdbc:mysql://root:VCiFYFcJEwQTJxgBOdTDQGsaTaJUIgLp@mysql.railway.internal:3306/railway
+    url: jdbc:mysql://root:VCiFYFcJEwQTJxgBOdTDQGsaTaJUIgLp@switchyard.proxy.rlwy.net:27678/railway
     username: root
     password: VCiFYFcJEwQTJxgBOdTDQGsaTaJUIgLp
   jpa: 
