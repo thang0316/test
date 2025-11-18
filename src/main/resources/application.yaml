@@ -1,0 +1,25 @@
+server:
+  port: 8080
+
+spring:
+  # Database Configuration
+  datasource:
+    url: jdbc:mysql://localhost:3306/fooddelivery
+    username: root
+    password: root
+  jpa: 
+    hibernate: 
+      ddl-auto: update
+    show-sql: true
+
+# VNPay configuration (fill with your credentials)
+vnpay:
+  vnp-tmn-code: "5C9DFPOH"
+  vnp-hash-secret: "FEYZ5TCZKQQ700BB8ZXFAIGRACW09UH7"
+  vnp-url: "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html"
+  vnp-return-url: "http://localhost:8080/api/payments/vnpay/return"
+
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    cache: false

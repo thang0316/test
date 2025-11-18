@@ -1,0 +1,220 @@
+<h3 class="text-primary mb-3">🚁 Quản lý Drone</h3>
+
+<div class="card p-3 mb-4">
+    <h5 class="text-success mb-3">➕ Thêm Drone</h5>
+
+    <div class="row g-2">
+        <div class="col-md-3">
+            <input id="model" class="form-control" placeholder="Model">
+        </div>
+
+        <div class="col-md-3">
+            <input id="battery" type="number" class="form-control" placeholder="Pin (%)">
+        </div>
+
+        <div class="col-md-3">
+            <select id="restaurantSelect" class="form-select">
+                <option disabled selected>Đang tải nhà hàng...</option>
+            </select>
+        </div>
+
+        <div class="col-md-2">
+            <button class="btn btn-primary w-100" onclick="addDrone()">Thêm</button>
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mb-4">
+    <h5 class="text-info mb-3">📍 Cập nhật vị trí Drone</h5>
+    <div class="row g-2">
+        <div class="col-md-3">
+            <select id="droneSelectLocation" class="form-select">
+                <option disabled selected>Chọn drone...</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input id="simLatitude" type="number" class="form-control" placeholder="Vĩ độ" step="0.000001" value="21.0285">
+        </div>
+        <div class="col-md-2">
+            <input id="simLongitude" type="number" class="form-control" placeholder="Kinh độ" step="0.000001" value="105.8542">
+        </div>
+        <div class="col-md-2">
+            <button onclick="updateDroneLocation()" class="btn btn-info w-100">Cập nhật</button>
+        </div>
+    </div>
+</div>
+
+<table class="table table-bordered table-striped">
+    <thead class="table-primary">
+    <tr>
+        <th>ID</th>
+        <th>Model</th>
+        <th>Pin</th>
+        <th>Trạng thái</th>
+        <th>Vĩ độ</th>
+        <th>Kinh độ</th>
+        <th>Nhà hàng</th>
+        <th>Xóa</th>
+    </tr>
+    </thead>
+    <tbody id="droneTable">
+    <tr><td colspan="8" class="text-center">Đang tải...</td></tr>
+    </tbody>
+</table>
+
+<script>
+    const API = window.apiBase || "http://localhost:8080/api";
+    console.log("API Base:", API);
+    
+    let restaurantsCache = null; // Cache nhà hàng
+
+    // ========== LOAD RESTAURANTS ==========
+    function loadRestaurants() {
+        const sel = document.getElementById("restaurantSelect");
+
+        console.log("📍 Bắt đầu load restaurants...");
+
+        fetch(API + "/restaurants")
+            .then(res => {
+                console.log("Response status:", res.status);
+                if(!res.ok) throw new Error(`HTTP ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                console.log("✓ Restaurants loaded:", data);
+                restaurantsCache = data;
+
+                if(!data || data.length === 0) {
+                    console.warn("⚠️ Không có nhà hàng");
+                    sel.innerHTML = `<option value="">-- Chọn nhà hàng --</option>`;
+                    return;
+                }
+
+                sel.innerHTML = `<option value="">-- Chọn nhà hàng --</option>` + 
+                    data.map(r => `<option value="${r.id}">${r.name}</option>`).join("");
+                
+                console.log("✓ Select updated - có", sel.options.length, "nhà hàng");
+            })
+            .catch(err => {
+                console.error("✗ Lỗi fetch restaurants:", err);
+                sel.innerHTML = `<option value="">-- Lỗi tải nhà hàng --</option>`;
+            });
+    }
+
+    // ========== LOAD DRONES ==========
+    async function loadDrones() {
+        const tbody = document.getElementById("droneTable");
+
+        try {
+            const res = await fetch(API + "/drones");
+            const data = await res.json();
+
+            if (!data.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center">Chưa có drone nào</td></tr>`;
+                return;
+            }
+
+            // Populate dropdown
+            const droneSelect = document.getElementById("droneSelectLocation");
+            droneSelect.innerHTML = '<option disabled selected>Chọn drone...</option>' +
+                data.map(d => `<option value="${d.id}">${d.model} (${d.id})</option>`).join("");
+
+            tbody.innerHTML = data.map(d => `
+                <tr>
+                    <td>${d.id}</td>
+                    <td>${d.model}</td>
+                    <td>${d.batteryLevel}%</td>
+                    <td>${d.status}</td>
+                    <td>${d.currentLatitude?.toFixed(6) || "—"}</td>
+                    <td>${d.currentLongitude?.toFixed(6) || "—"}</td>
+                    <td>${d.restaurant?.name || "—"}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDrone('${d.id}')">Xóa</button>
+                    </td>
+                </tr>
+            `).join("");
+
+        } catch (err) {
+            tbody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Lỗi tải drone</td></tr>`;
+        }
+    }
+
+    // ========== CREATE ==========
+    async function addDrone() {
+        const data = {
+            model: document.getElementById("model").value,
+            batteryLevel: Number(document.getElementById("battery").value),
+            restaurantId: document.getElementById("restaurantSelect").value
+        };
+
+        if (!data.model || !data.restaurantId) {
+            alert("Vui lòng nhập đủ!");
+            return;
+        }
+
+        const res = await fetch(API + "/drones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        if (!res.ok) {
+            alert("❌ Lỗi API!");
+            return;
+        }
+
+        alert("🎉 Thêm drone thành công!");
+        restaurantsCache = null;  // Xóa cache để lần sau fetch lại
+        loadDrones();
+    }
+
+    // ========== DELETE ==========
+    async function deleteDrone(id) {
+        if (!confirm("Bạn có chắc?")) return;
+
+        await fetch(API + "/drones/" + id, { method: "DELETE" });
+        loadDrones();
+    }
+
+    // ========== UPDATE LOCATION ==========
+    async function updateDroneLocation() {
+        const droneId = document.getElementById("droneSelectLocation").value;
+        const lat = parseFloat(document.getElementById("simLatitude").value);
+        const lng = parseFloat(document.getElementById("simLongitude").value);
+        
+        if(!droneId || isNaN(lat) || isNaN(lng)) { 
+            alert("❌ Chọn drone và nhập tọa độ hợp lệ!"); 
+            return; 
+        }
+        
+        try {
+            const res = await fetch(API + "/drones/" + droneId + "/location?latitude=" + lat + "&longitude=" + lng, {
+                method: "PUT",
+                headers: {"Content-Type": "application/json"}
+            });
+            
+            if (!res.ok) {
+                alert("❌ Lỗi cập nhật vị trí: " + res.status);
+                return;
+            }
+            
+            alert("✅ Vị trí drone cập nhật thành công!");
+            console.log("✅ Location updated to:", lat, lng);
+            loadDrones();
+        } catch (e) {
+            alert("❌ Error: " + e.message);
+            console.error("Location update error:", e);
+        }
+    }
+
+    // INIT
+    function init() {
+        console.log("🚀 Init page...");
+        // Pre-load restaurants ngay
+        loadRestaurants();
+        // Load drones
+        loadDrones();
+    }
+    
+    init();
+</script>

@@ -1,0 +1,166 @@
+<h3>Thanh toán đơn hàng</h3>
+
+<div id="checkoutBox">Đang tải...</div>
+
+<script>
+    /* ============================
+          LẤY USER FORMAT ĐÚNG
+    =============================== */
+    function getUser(){
+        return JSON.parse(localStorage.getItem("loggedInUser") || "{}");
+    }
+
+    function getCart(){
+        return JSON.parse(localStorage.getItem("cart") || "[]");
+    }
+
+    /* ============================
+          LOAD USER
+    =============================== */
+    async function loadUser(){
+        let user = getUser();
+
+        if(!user.id){
+            checkoutBox.innerHTML = "<p class='text-danger'>Không tìm thấy tài khoản người dùng!</p>";
+            return null;
+        }
+
+        const res = await fetch(`/api/users/${user.id}`);
+        return await res.json();
+    }
+
+    /* ============================
+          LOAD CHECKOUT PAGE
+    =============================== */
+    async function loadCheckout(){
+        let cart = getCart();
+
+        if(cart.length === 0){
+            checkoutBox.innerHTML = "<p>Giỏ hàng trống.</p>";
+            return;
+        }
+
+        let user = await loadUser();
+        if(!user) return;
+
+        let total = 0;
+        let html = "";
+
+        cart.forEach(i => {
+            total += i.qty * i.price;
+            html += `
+            <div class="border rounded p-2 mb-2 d-flex">
+                <img src="${i.img}" width="65" class="rounded">
+                <div class="ms-2">
+                    <b>${i.name}</b><br>
+                    x${i.qty} — <b>${i.price.toLocaleString()}đ</b>
+                </div>
+            </div>
+        `;
+        });
+
+        html += `
+        <h4 class="text-danger">Tổng: ${total.toLocaleString()}đ</h4>
+
+        <h5 class="mt-3">Thông tin giao hàng</h5>
+        <label class="form-label">Họ và tên <span class="text-danger">*</span></label>
+        <input id="name" class="form-control mt-2" value="${user.firstName || ""} ${user.lastName || ""}" required>
+        
+        <label class="form-label mt-2">Số điện thoại <span class="text-danger">*</span></label>
+        <input id="phone" class="form-control mt-2" value="${user.phone || ""}" placeholder="Nhập số điện thoại" required>
+        
+        <label class="form-label mt-2">Địa chỉ giao hàng <span class="text-danger">*</span></label>
+        <input id="addr" class="form-control mt-2" placeholder="Nhập địa chỉ giao hàng" required>
+
+        <label class="form-label mt-2">Phương thức thanh toán <span class="text-danger">*</span></label>
+        <select id="paymentMethod" class="form-control mt-2" required>
+            <option value="VNPAY">Thanh toán VNPay</option>
+        </select>
+
+        <button onclick="submitOrder(${total})" class="btn btn-danger w-100 mt-3">
+            Đặt hàng
+        </button>
+    `;
+
+        checkoutBox.innerHTML = html;
+    }
+
+    loadCheckout();
+
+    /* ============================
+            SUBMIT ORDER
+    =============================== */
+    async function submitOrder(total){
+        let cart = getCart();
+        let user = getUser();
+
+        if(cart.length === 0){
+            alert(" Giỏ hàng trống!");
+            return;
+        }
+
+        let name = document.getElementById("name").value.trim();
+        let phone = document.getElementById("phone").value.trim();
+        let addr = document.getElementById("addr").value.trim();
+
+        // Validation
+        if(!name || !phone || !addr){
+            alert(" Vui lòng nhập đầy đủ thông tin giao hàng!");
+            return;
+        }
+
+        let restaurantId = cart[0].restaurantId;
+
+        let payload = {
+            userId: user.id,
+            restaurantId: restaurantId,
+            customerName: name,
+            customerPhone: phone,
+            customerAddress: addr,
+
+            items: cart.map(i => ({
+                menuItemId: Number(i.id),
+                quantity: i.qty
+            }))
+        };
+
+        try {
+            const res = await fetch("/api/orders", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
+
+            if(!res.ok){
+                alert(" Không thể tạo đơn hàng!");
+                return;
+            }
+
+            const order = await res.json();
+            const orderId = order.id;
+
+            // Redirect to VNPay
+            try {
+                const paymentRes = await fetch(`/api/payments/vnpay/create?orderId=${orderId}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'}
+                });
+
+                if(!paymentRes.ok){
+                    alert(" Không thể kết nối VNPay!");
+                    return;
+                }
+
+                const vnpayUrl = await paymentRes.text();
+                localStorage.removeItem("cart");
+                window.location.href = vnpayUrl;
+            } catch(error){
+                console.error("VNPay error:", error);
+                alert(" Lỗi: " + error.message);
+            }
+        } catch(error){
+            console.error("Submit order error:", error);
+            alert(" Lỗi: " + error.message);
+        }
+    }
+</script>
