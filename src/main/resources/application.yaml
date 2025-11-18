@@ -4,9 +4,9 @@ server:
 spring:
   # Database Configuration
   datasource:
-    url: jdbc:mysql://localhost:3306/fooddelivery
+    url: jdbc:mysql://root:VCiFYFcJEwQTJxgBOdTDQGsaTaJUIgLp@mysql.railway.internal:3306/railway
     username: root
-    password: root
+    password: VCiFYFcJEwQTJxgBOdTDQGsaTaJUIgLp
   jpa: 
     hibernate: 
       ddl-auto: update
